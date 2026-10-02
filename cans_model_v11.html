@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CANS Building — Testbed Geometry Model v9</title>
+
+<style>
+  :root{
+    --ink:#0b0e13; --panel:#161b22; --panel-2:#1d242e; --line:#2c3542;
+    --text:#dbe2ea; --dim:#8d9aab; --field:#090c11; --gw:#10aab8; --stair:#d97a06;
+    --z1:#1f9160; --z2:#bf9310; --z3:#c85a14; --z4:#b02a42; --z5:#7642ab; --z6:#1f63b5;
+    --labs:#4a5c72; --walk:#10aab8; --glaze:#7fd4e8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--ink);color:var(--text);
+    font-family:ui-sans-serif,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  input,select,button,textarea{font:inherit;color:inherit}
+  input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible{
+    outline:2px solid var(--gw);outline-offset:1px}
+
+  #app{display:grid;grid-template-columns:330px 1fr;grid-template-rows:1fr auto;height:100vh}
+  #panel{grid-row:1 / span 2;background:var(--panel);border-right:1px solid var(--line);
+    overflow-y:auto;padding:18px 16px 48px}
+  #panel h1{font-size:15px;font-weight:600;margin:0 0 2px}
+  #panel .sub{color:var(--dim);margin:0 0 16px;font-size:12px}
+  .grp{border-top:1px solid var(--line);padding:14px 0 6px}
+  .grp>h2{font-size:12px;font-weight:600;margin:0 0 11px}
+
+  .dim{margin-bottom:12px}
+  .dim .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+  .dim label{color:var(--dim);font-size:12px}
+  .dim input[type=number]{width:84px;background:var(--field);border:1px solid var(--line);
+    border-radius:4px;padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums}
+  .dim input[type=range]{width:100%;display:block;accent-color:var(--gw);margin:0}
+
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+  .row label{color:var(--dim);font-size:12px;flex:1}
+  .row input[type=number]{width:84px;background:var(--field);border:1px solid var(--line);
+    border-radius:4px;padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums}
+  .row select{background:var(--field);border:1px solid var(--line);border-radius:4px;padding:4px 6px}
+  .row input[type=checkbox]{accent-color:var(--gw)}
+
+  .checks{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chk{display:flex;align-items:center;gap:5px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px}
+  .chk input{accent-color:var(--gw);margin:0}
+  .note{color:var(--dim);font-size:11.5px;margin:10px 0 0}
+  .derived{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
+    padding:8px 10px;margin-top:10px;font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .derived b{color:var(--text)}
+  button.act{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
+    padding:6px 11px;cursor:pointer;font-size:12px;width:100%;margin-top:6px}
+  button.act:hover{border-color:var(--gw)}
+  textarea{width:100%;margin-top:8px;background:var(--field);border:1px solid var(--line);
+    border-radius:4px;padding:6px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}
+
+  #stage{position:relative;overflow:hidden;background:var(--ink)}
+  #view{position:absolute;inset:0}
+  #view canvas{display:block}
+  #labels{position:absolute;inset:0;pointer-events:none}
+  .lbl{position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:600;
+    text-shadow:0 0 6px #000,0 0 2px #000;white-space:nowrap}
+  #viewbar{position:absolute;top:12px;left:12px;display:flex;gap:6px}
+  #viewbar button,#shotbtn,#fitbtn{background:rgba(22,27,34,.92);border:1px solid var(--line);
+    border-radius:4px;padding:5px 11px;cursor:pointer;font-size:12px}
+  #viewbar button[aria-pressed=true]{background:var(--gw);border-color:var(--gw);color:#06202a;font-weight:600}
+  #topright{position:absolute;top:12px;right:12px;display:flex;gap:6px}
+  #readout{position:absolute;top:48px;left:12px;background:rgba(11,14,19,.85);
+    border:1px solid var(--line);border-radius:4px;padding:6px 10px;font-size:11.5px;
+    color:var(--dim);font-variant-numeric:tabular-nums}
+  #readout b{color:var(--text);font-weight:600}
+  #legend{position:absolute;left:12px;bottom:12px;display:flex;flex-wrap:wrap;gap:10px;
+    background:rgba(11,14,19,.85);border:1px solid var(--line);border-radius:4px;
+    padding:7px 11px;font-size:11.5px;max-width:74%}
+  #legend span{display:flex;align-items:center;gap:5px;color:var(--dim)}
+  #legend i{width:10px;height:10px;border-radius:2px;display:block}
+  #hint{position:absolute;right:12px;bottom:12px;color:var(--dim);font-size:11px}
+
+  #metrics{background:var(--panel);border-top:1px solid var(--line);padding:12px 16px 14px;
+    max-height:38vh;overflow:auto}
+  #metrics header{display:flex;align-items:baseline;gap:12px;margin-bottom:9px;flex-wrap:wrap}
+  #metrics h2{font-size:12.5px;font-weight:600;margin:0}
+  #metrics header p{margin:0;color:var(--dim);font-size:11.5px}
+  table{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12px}
+  th,td{border:1px solid var(--line);padding:5px 9px;text-align:right}
+  th{color:var(--dim);font-weight:500;background:var(--panel-2)}
+  th:first-child,td:first-child{text-align:left}
+  td.dead{color:#e5737f}
+  td.viacorr::after{content:'\25CF';color:var(--gw);margin-left:5px;font-size:9px;vertical-align:2px}
+  td.viacourt::after{content:'\25CB';color:var(--gw);margin-left:5px;font-size:9px;vertical-align:2px}
+  td.viashaft::after{content:'\25B2';color:var(--stair);margin-left:5px;font-size:9px;vertical-align:1px}
+  #detail{margin-top:9px;color:var(--dim);font-size:11.5px;min-height:1.4em}
+
+  @media (max-width:900px){
+    #app{grid-template-columns:1fr;grid-template-rows:52vh auto auto}
+    #panel{grid-row:auto;border-right:none;border-top:1px solid var(--line)}
+    #stage{order:-1}
+    #legend{font-size:10.5px;gap:8px}
+  }
+</style>
+
+<div id="app">
+  <aside id="panel">
+    <h1>CANS Building — testbed geometry</h1>
+    <p class="sub">v9. East to west 175 m, Zone 1 at the east end. North to south 51.56 m.
+       The roof is continuous; the only openings to the sky are the courtyards.</p>
+
+    <div class="grp">
+      <h2>Overall envelope</h2>
+      <div class="dim"><div class="top"><label for="SPAN">East to west span</label><input type="number" id="SPAN" value="175" step="0.5"></div>
+        <input type="range" id="SPAN_s" min="60" max="320" step="0.5" value="175"></div>
+      <div class="dim"><div class="top"><label for="HT">Height to roof</label><input type="number" id="HT" value="15" step="0.1"></div>
+        <input type="range" id="HT_s" min="4" max="40" step="0.1" value="15"></div>
+      <div class="row"><label for="NF">Number of floors</label><input type="number" id="NF" value="4" step="1"></div>
+      <div class="row"><label for="SL">Slab thickness</label><input type="number" id="SL" value="0.2" step="0.05"></div>
+      <div class="derived" id="envDerived"></div>
+    </div>
+
+    <div class="grp">
+      <h2>North to south section</h2>
+      <div class="dim"><div class="top"><label for="LABD">Labs, north &mdash; 450 in</label><input type="number" id="LABD" value="11.43" step="0.1"></div>
+        <input type="range" id="LABD_s" min="3" max="40" step="0.1" value="11.43"></div>
+      <div class="dim"><div class="top"><label for="GAPD">Walkway band &mdash; 250 in</label><input type="number" id="GAPD" value="6.35" step="0.1"></div>
+        <input type="range" id="GAPD_s" min="1" max="25" step="0.1" value="6.35"></div>
+      <div class="dim"><div class="top"><label for="BLKD">Zone block, to the south &mdash; 1330 in</label><input type="number" id="BLKD" value="33.78" step="0.1"></div>
+        <input type="range" id="BLKD_s" min="8" max="80" step="0.1" value="33.78"></div>
+      <div class="dim"><div class="top"><label for="FARD">South strip with the main stairwells</label><input type="number" id="FARD" value="9" step="0.5"></div>
+        <input type="range" id="FARD_s" min="2" max="30" step="0.5" value="9"></div>
+      <p class="note">The walkway joins the labs to the zones structurally and is roofed over. The
+         courtyards cut south from the walkway and stop at the south strip.</p>
+      <div class="derived" id="crossDerived"></div>
+    </div>
+
+    <div class="grp">
+      <h2>Courtyards, east to west</h2>
+      <div class="dim"><div class="top"><label for="COW">Open courtyard &mdash; S1, S3, S5</label><input type="number" id="COW" value="12" step="0.5"></div>
+        <input type="range" id="COW_s" min="2" max="40" step="0.5" value="12"></div>
+      <div class="dim"><div class="top"><label for="CGW">Glazed well &mdash; S2, S4</label><input type="number" id="CGW" value="4" step="0.25"></div>
+        <input type="range" id="CGW_s" min="1" max="20" step="0.25" value="4"></div>
+      <div class="row"><label for="showGlaze">Draw the glazed canopies</label><input type="checkbox" id="showGlaze" checked></div>
+      <p class="note">S1, S3 and S5 are open to the sky with grass and an external stair tower on the
+         south strip. S2 and S4 are narrow wells under a translucent canopy.</p>
+    </div>
+
+    <div class="grp">
+      <h2>Stairs</h2>
+      <div class="row"><label for="STW">South stair tower width</label><input type="number" id="STW" value="6" step="0.5"></div>
+      <div class="row"><label for="STP">Projection north into the courtyard</label><input type="number" id="STP" value="4.5" step="0.5"></div>
+      <div class="row"><label for="STH">Head house above roof</label><input type="number" id="STH" value="2.8" step="0.2"></div>
+      <div class="row"><label for="ISW">Internal core width, Z1 and Z4</label><input type="number" id="ISW" value="4.5" step="0.5"></div>
+      <div class="row"><label for="ISD">Core depth south from the walkway</label><input type="number" id="ISD" value="6" step="0.5"></div>
+      <div class="row"><label for="ISO">Core inset from the block’s east edge</label><input type="number" id="ISO" value="2" step="0.5"></div>
+      <div class="row"><label for="showInner">Draw internal cores</label><input type="checkbox" id="showInner" checked></div>
+      <p class="note">The Z1 and Z4 cores sit at the east end of their block, hard against the walkway and
+         flush with the facade. They are open fronted and run the full height, so they are a
+         vertical route between the roof and every floor of those two zones.</p>
+    </div>
+
+    <div class="grp">
+      <h2>Interlinkages out of the building</h2>
+      <div class="row"><label for="showLink">Show interlinkages</label><input type="checkbox" id="showLink" checked></div>
+      <div class="row"><label for="LKW">Bridge width</label><input type="number" id="LKW" value="5" step="0.5"></div>
+      <div class="row"><label for="LKO">Overhang north past the labs</label><input type="number" id="LKO" value="14" step="0.5"></div>
+      <div class="row"><label for="LKF0">Lowest floor carrying it</label><input type="number" id="LKF0" value="2" step="1"></div>
+      <div class="row"><label for="LKF1">Highest floor carrying it</label><input type="number" id="LKF1" value="3" step="1"></div>
+      <p class="note">Two bridges aligned on S2 and S4, out through the labs to the north. Floors two
+         and three only. They give the labs their three-part look from the back.</p>
+    </div>
+
+    <div class="grp">
+      <h2>Walkway</h2>
+      <div class="row"><label for="showWalk">Draw the walkway band</label><input type="checkbox" id="showWalk" checked></div>
+      <div class="row"><label for="WKEND">Walkway stops short of the west end by</label><input type="number" id="WKEND" value="8" step="0.5"></div>
+      <p class="note">Continuous from Zone 1 to Zone 6 with no breaks. Zone 6 carries on past where it
+         stops.</p>
+    </div>
+
+    <div class="grp">
+      <h2>Gateway</h2>
+      <div class="row"><label for="gwOn">Mounted</label>
+        <select id="gwOn">
+          <option value="roof" selected>On the roof</option>
+          <option value="c0">In courtyard S1</option>
+          <option value="c2">In courtyard S3</option>
+          <option value="c4">In courtyard S5</option>
+        </select></div>
+      <div class="dim"><div class="top"><label for="GX">Position from the east end</label><input type="number" id="GX" value="88" step="0.5"></div>
+        <input type="range" id="GX_s" min="0" max="320" step="0.5" value="88"></div>
+      <div class="dim"><div class="top"><label for="GZ">Position from the north face</label><input type="number" id="GZ" value="30" step="0.5"></div>
+        <input type="range" id="GZ_s" min="0" max="120" step="0.5" value="30"></div>
+      <div class="row"><label for="GH">Mast height above roof</label><input type="number" id="GH" value="3" step="0.25"></div>
+      <div class="row"><label for="rays">Show paths to zones</label><input type="checkbox" id="rays" checked></div>
+    </div>
+
+    <div class="grp">
+      <h2>View</h2>
+      <div class="dim"><div class="top"><label for="EX">Explode floors apart</label><input type="number" id="EX" value="0" step="0.5"></div>
+        <input type="range" id="EX_s" min="0" max="20" step="0.5" value="0"></div>
+      <div class="row"><label for="OPA">Wall opacity</label><input type="number" id="OPA" value="0.92" step="0.05"></div>
+      <div class="row"><label for="showRoof">Show the roof</label><input type="checkbox" id="showRoof" checked></div>
+      <div class="row"><label for="ghost">Fade hidden floors instead of removing</label><input type="checkbox" id="ghost"></div>
+      <div class="row"><label for="showLabs">Show labs strip</label><input type="checkbox" id="showLabs" checked></div>
+      <div><label style="color:var(--dim);font-size:12px">Floors shown</label><div class="checks" id="floorChecks"></div></div>
+    </div>
+
+    <div class="grp">
+      <h2>Path loss coefficients</h2>
+      <div class="row"><label for="LW">Loss per concrete wall, dB</label><input type="number" id="LW" value="12" step="0.5"></div>
+      <div class="row"><label for="LF">Loss per floor slab, dB</label><input type="number" id="LF" value="15" step="0.5"></div>
+      <div class="row"><label for="LEO">Down an open courtyard, dB</label><input type="number" id="LEO" value="5" step="0.5"></div>
+      <div class="row"><label for="LEG">Down a glazed well, dB</label><input type="number" id="LEG" value="12" step="0.5"></div>
+      <div class="row"><label for="CORR">Along the walkway, dB per metre</label><input type="number" id="CORR" value="0.15" step="0.01"></div>
+      <div class="row"><label for="NPART">Partitions from a face to a node</label><input type="number" id="NPART" value="2" step="1"></div>
+      <div class="row"><label for="LST">Past an external stair tower, dB</label><input type="number" id="LST" value="8" step="0.5"></div>
+      <div class="row"><label for="LSH">Down a Z1 or Z4 stair shaft, dB</label><input type="number" id="LSH" value="7" step="0.5"></div>
+      <div class="row"><label for="SENS">SF12 sensitivity, dBm</label><input type="number" id="SENS" value="-137" step="0.5"></div>
+      <div class="row"><label for="EIRP">EIRP plus Rx gain, dBm</label><input type="number" id="EIRP" value="16" step="0.5"></div>
+      <p class="note">Multi-wall estimate at 868 MHz for ranking candidate gateway positions before
+         the campaign. Every coefficient is an assumption until measured. It is not a result.</p>
+    </div>
+
+    <div class="grp">
+      <h2>Settings</h2>
+      <button class="act" id="expBtn">Export settings to the box</button>
+      <textarea id="cfgBox" rows="5" placeholder="Paste exported settings here, then press Apply"></textarea>
+      <button class="act" id="impBtn">Apply settings from the box</button>
+      <p class="note" id="cfgMsg"></p>
+    </div>
+  </aside>
+
+  <main id="stage">
+    <div id="view"></div>
+    <div id="labels"></div>
+    <div id="viewbar"><button id="btn3d" aria-pressed="true">3D</button><button id="btnplan" aria-pressed="false">Plan</button></div>
+    <div id="topright"><button id="fitbtn">Fit</button><button id="shotbtn">Save image</button></div>
+    <div id="readout"></div>
+    <div id="legend"></div>
+    <div id="hint">Drag to orbit &middot; shift-drag or right-drag to pan &middot; scroll to zoom &middot; Fit recentres</div>
+  </main>
+
+  <section id="metrics">
+    <header>
+      <h2>Gateway to zone geometry and estimated loss</h2>
+      <p>Folded path (m) and estimated total loss (dB), best of the routes.
+         &#9679; courtyard then along the walkway &middot; &#9675; straight down a courtyard &middot; &#9650; down a Z1/Z4 stair shaft &middot; plain means through the structure. Red falls below sensitivity. Click a cell.</p>
+    </header>
+    <div id="tableWrap"></div>
+    <div id="detail">Click a cell for its obstacle breakdown.</div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+
+var NZONE=6, NCOURT=5;
+/* east to west: S1 open, S2 glazed, S3 open, S4 glazed, S5 open */
+var COURT_OPEN=[true,false,true,false,true];
+
+var P={ SPAN:175, HT:15, NF:4, SL:0.2,
+        LABD:11.43, GAPD:6.35, BLKD:33.78, FARD:9,
+        COW:12, CGW:4,
+        STW:6, STP:4.5, STH:2.8, ISW:4.5, ISD:6, ISO:2,
+        LKW:5, LKO:14, LKF0:2, LKF1:3,
+        WKEND:8,
+        GX:88, GZ:30, GH:3, EX:0, OPA:0.92,
+        LW:12, LF:15, LEO:5, LEG:12, CORR:0.15, NPART:2, LST:8, LSH:7, SENS:-137, EIRP:16 };
+
+var LIM={ SPAN:{min:60,max:320}, HT:{min:4,max:40}, NF:{min:1,max:10,integer:true},
+          SL:{min:0.05,max:1},
+          LABD:{min:3,max:40}, GAPD:{min:1,max:25}, BLKD:{min:8,max:80}, FARD:{min:2,max:30},
+          COW:{min:2,max:40}, CGW:{min:1,max:20},
+          STW:{min:1,max:25}, STP:{min:0,max:20}, STH:{min:0,max:12},
+          ISW:{min:0,max:20}, ISD:{min:0,max:30}, ISO:{min:0,max:40},
+          LKW:{min:1,max:25}, LKO:{min:0,max:60}, LKF0:{min:0,max:9,integer:true},
+          LKF1:{min:0,max:9,integer:true},
+          WKEND:{min:0,max:60},
+          GX:{min:0,max:320}, GZ:{min:0,max:120}, GH:{min:0,max:20},
+          EX:{min:0,max:20}, OPA:{min:0.05,max:1},
+          LW:{min:0,max:40}, LF:{min:0,max:40}, LEO:{min:0,max:40}, LEG:{min:0,max:40},
+          CORR:{min:0,max:3}, NPART:{min:0,max:8,integer:true}, LST:{min:0,max:40}, LSH:{min:0,max:40},
+          SENS:{min:-150,max:-100}, EIRP:{min:0,max:40} };
+
+var ZCOL=[0x1f9160,0xbf9310,0xc85a14,0xb02a42,0x7642ab,0x1f63b5];
+var ZCSS=['--z1','--z2','--z3','--z4','--z5','--z6'];
+var LABS_COL=0x4a5c72, FAR_COL=0x5d6e85, STAIR_COL=0xd97a06,
+    WALK_COL=0x10aab8, ROOF_COL=0x8d9cb0, GLAZE_COL=0x7fd4e8, GRASS_COL=0x4f7347;
+var FLOOR_NAMES=["Ground","First","Second","Third","Fourth","Fifth","Sixth","Seventh","Eighth","Ninth"];
+
+var visible=[true,true,true,true,true,true,true,true,true,true];
+var showRays=true, planView=false, ghost=false,
+    showLabs=true, showWalk=true, showLink=true, showGlaze=true, showInner=true, showRoof=true;
+var gwOn='roof';
+
+/* ================= derived geometry =================
+   X runs east (x0) to west (x0+SPAN).  Zone 1 is at the east end.
+   Z runs north (z0) to south:
+     Z = 0 .............. LABD                 laboratories, north
+         LABD ........... LABD+GAPD            walkway band, joined to both sides, roofed
+         LABD+GAPD ...... .. -FARD             zone blocks, cut by the courtyards
+         .. -FARD ....... LABD+GAPD+BLKD       south strip, corridor, offices, main stairwells
+   The roof is continuous except over the courtyards.
+*/
+function courtW(i){ return COURT_OPEN[i] ? P.COW : P.CGW; }
+function courtTotal(){ var t=0; for(var i=0;i<NCOURT;i++) t+=courtW(i); return t; }
+function zoneWidth(){ return Math.max(0.5,(P.SPAN-courtTotal())/NZONE); }
+function crossTotal(){ return P.LABD+P.GAPD+P.BLKD; }
+function farDepth(){ return Math.min(P.FARD, P.BLKD-0.5); }
+function courtCut(){ return Math.max(0.5, P.BLKD-farDepth()); }
+function floorH(){ return Math.max(1.2,(P.HT-P.SL)/P.NF-P.SL); }
+function floorBaseY(f){ return f*(floorH()+P.SL+P.EX); }
+function roofY(){ return P.NF*(floorH()+P.SL+P.EX)+P.SL; }
+
+function x0(){ return -P.SPAN/2; }
+function z0(){ return -crossTotal()/2; }
+function zLabs1(){ return z0()+P.LABD; }
+function zWalk0(){ return zLabs1(); }
+function zWalk1(){ return zLabs1()+P.GAPD; }
+function zBlk0(){ return zWalk1(); }
+function zBlk1(){ return zWalk1()+P.BLKD; }
+function zFar0(){ return zBlk1()-farDepth(); }
+
+/* Bands are listed in increasing world x, which runs WEST to EAST.
+   Zone 1 is at the east end, so the list starts at Z6 in the west:
+   Z6 S5 Z5 S4 Z4 S3 Z3 S2 Z2 S1 Z1 */
+function computeBands(){
+  var b=[], x=0, zw=zoneWidth();
+  for(var i=NZONE-1;i>=0;i--){
+    b.push({x0:x, x1:x+zw, type:'block', zone:i, name:'Z'+(i+1)}); x+=zw;
+    if(i>0){
+      var ci=i-1, w=courtW(ci);
+      b.push({x0:x, x1:x+w, type:'court', idx:ci, open:COURT_OPEN[ci], name:'S'+(ci+1)}); x+=w;
+    }
+  }
+  return b;
+}
+var bands=computeBands();
+
+function zoneSpan(z){
+  for(var i=0;i<bands.length;i++){
+    var b=bands[i];
+    if(b.type==='block'&&b.zone===z) return {a:x0()+b.x0, b:x0()+b.x1};
+  }
+  return {a:0,b:1};
+}
+function courtSpan(i){
+  for(var k=0;k<bands.length;k++){
+    var b=bands[k];
+    if(b.type==='court'&&b.idx===i)
+      return {a:x0()+b.x0, b:x0()+b.x1, mid:x0()+(b.x0+b.x1)/2, open:b.open};
+  }
+  return null;
+}
+function zoneCentroid(z,f){
+  var s=zoneSpan(z);
+  return new THREE.Vector3((s.a+s.b)/2,
+    floorBaseY(f)+P.SL+(floorH()-P.SL)/2,
+    zBlk0()+courtCut()*0.5);
+}
+function walkMidZ(){ return (zWalk0()+zWalk1())/2; }
+
+/* Z1 and Z4 each carry an open-fronted stair shaft at the EAST end of their block,
+   hard against the walkway. It runs the full height, so it is a vertical express
+   route between the roof and every floor of that zone. */
+function hasCore(z){ return z===0 || z===3; }
+function coreSpan(z){
+  var s=zoneSpan(z), w=Math.min(P.ISW, s.b-s.a);
+  var b=s.b-P.ISO;                 /* offset in from the block's east edge */
+  if(b-w < s.a) b = s.a + w;
+  return {a:b-w, b:b, mid:b-w/2};
+}
+function coreMouth(z,f){
+  var cs=coreSpan(z);
+  return new THREE.Vector3(cs.mid, floorBaseY(f)+P.SL+(floorH()-P.SL)/2,
+                           zBlk0()+Math.min(P.ISD,courtCut())/2);
+}
+
+/* ================= three.js ================= */
+var host=document.getElementById('view'), labelHost=document.getElementById('labels');
+var scene=new THREE.Scene(); scene.background=new THREE.Color(0x0b0e13);
+var renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+host.appendChild(renderer.domElement);
+var camP=new THREE.PerspectiveCamera(42,1,0.5,9000);
+var camO=new THREE.OrthographicCamera(-1,1,1,-1,0.1,9000);
+scene.add(new THREE.HemisphereLight(0xd6e4f2,0x232a34,1.05));
+var k1=new THREE.DirectionalLight(0xffffff,0.85); k1.position.set(90,160,70); scene.add(k1);
+var k2=new THREE.DirectionalLight(0xa8c6e4,0.34); k2.position.set(-90,55,-80); scene.add(k2);
+var root=new THREE.Group(); scene.add(root);
+var rayGroup=new THREE.Group(); scene.add(rayGroup);
+var theta=0.80, phi=1.00, radius=300, target=new THREE.Vector3(0,9,0);
+var panX=0, panZ=0;   /* plan-view pan, world units */
+
+function boxAt(ax,bx,az,bz,ay,by,col,op,eop){
+  op=Math.max(0.02,Math.min(1,op)); eop=Math.max(0.02,Math.min(1,eop));
+  var g=new THREE.Group(), w=bx-ax, d=bz-az, h=by-ay;
+  if(w<=0.001||d<=0.001||h<=0.001) return g;
+  var geo=new THREE.BoxGeometry(w,h,d);
+  var m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:op}));
+  m.position.set(ax+w/2, ay+h/2, az+d/2); g.add(m);
+  var e=new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({color:col,transparent:true,opacity:eop}));
+  e.position.copy(m.position); g.add(e);
+  return g;
+}
+
+var labelAnchors=[];
+function build(){
+  while(root.children.length) root.remove(root.children[0]);
+  labelAnchors=[]; bands=computeBands();
+
+  var X=x0(), S=P.SPAN, H=floorH(), op0=P.OPA;
+  var lz0=z0(), lz1=zLabs1(), wz0=zWalk0(), wz1=zWalk1(),
+      bz0=zBlk0(), bz1=zBlk1(), fz0=zFar0();
+
+  var pad=34;
+  var gpl=new THREE.Mesh(new THREE.PlaneGeometry(S+pad*2, crossTotal()+pad*2+P.LKO),
+        new THREE.MeshLambertMaterial({color:0x1b2430,transparent:true,opacity:0.5}));
+  gpl.rotation.x=-Math.PI/2; gpl.position.set(0,-0.06,0); root.add(gpl);
+
+  /* grass in the open courtyards */
+  for(var c0=0;c0<NCOURT;c0++){
+    var cs0=courtSpan(c0);
+    if(!cs0||!cs0.open) continue;
+    root.add(boxAt(cs0.a, cs0.b, bz0, fz0, -0.02, 0.1, GRASS_COL, 0.95, 0.5));
+  }
+
+  for(var f=0; f<P.NF; f++){
+    var shown=visible[f];
+    if(!shown && !ghost) continue;
+    var op = shown ? op0 : 0.04, eop = shown ? 0.85 : 0.12;
+    var ya=floorBaseY(f), yb=ya+P.SL+H;
+
+    /* laboratories, continuous along the whole east-west span */
+    if(showLabs) root.add(boxAt(X, X+S, lz0, lz1, ya, yb, LABS_COL, op*0.92, eop*0.9));
+
+    /* walkway band, structurally joined to the labs and to the zones */
+    if(showWalk){
+      var wEnd = X+S-P.WKEND;
+      root.add(boxAt(X, wEnd, wz0, wz1, ya, ya+P.SL, WALK_COL, op, eop*0.95));
+      /* its roof at this level is the slab of the floor above, drawn as a thin soffit */
+      root.add(boxAt(X, wEnd, wz0, wz1, yb-P.SL, yb, WALK_COL, op*0.55, eop*0.6));
+    }
+
+    /* south strip with the corridor, offices and main stairwells */
+    root.add(boxAt(X, X+S, fz0, bz1, ya, yb, FAR_COL, op*0.92, eop*0.9));
+
+    /* zone blocks */
+    for(var i=0;i<bands.length;i++){
+      var b=bands[i];
+      if(b.type!=='block') continue;
+      root.add(boxAt(X+b.x0, X+b.x1, bz0, fz0, ya, yb, ZCOL[b.zone], op, eop));
+      /* internal stair core in Z1 and Z4: hard against the walkway at the east end
+         of the block, flush with the facade, not projecting */
+      if(showInner && hasCore(b.zone)){
+        var cs2=coreSpan(b.zone);
+        root.add(boxAt(cs2.a, cs2.b, bz0, Math.min(bz0+P.ISD, fz0), ya, yb,
+                       STAIR_COL, Math.min(1,op*1.1), eop));
+      }
+    }
+
+    /* external stair towers on the south strip, projecting north into the open courtyards */
+    for(var s=0;s<NCOURT;s++){
+      var cs=courtSpan(s);
+      if(!cs||!cs.open||P.STP<=0||P.STW<=0) continue;
+      var sm=cs.mid, shw=Math.min(P.STW,cs.b-cs.a)/2;
+      root.add(boxAt(sm-shw, sm+shw, fz0-P.STP, fz0, ya, ya+P.SL, STAIR_COL, Math.min(0.8,op*1.6), eop));
+      var side=(f%2===0)?1:-1;
+      root.add(boxAt(side>0?sm:sm-shw, side>0?sm+shw:sm, fz0-P.STP, fz0,
+                     ya+P.SL, ya+P.SL+H*0.5, STAIR_COL, op*0.7, eop*0.8));
+    }
+
+    /* interlinkage bridges, north out through the labs */
+    if(showLink && f>=P.LKF0 && f<=P.LKF1){
+      for(var g1=0; g1<NCOURT; g1++){
+        var cg=courtSpan(g1);
+        if(!cg||cg.open) continue;
+        var lm=cg.mid, lhw=P.LKW/2;
+        root.add(boxAt(lm-lhw, lm+lhw, lz0-P.LKO, lz0, ya, yb, STAIR_COL, op*0.85, eop*0.9));
+      }
+    }
+  }
+
+  /* continuous roof, with openings only over the courtyards */
+  if(showRoof){
+    var rop=op0*0.85, ry0=roofY()-P.SL, ry1=roofY();
+    if(showLabs) root.add(boxAt(X, X+S, lz0, lz1, ry0, ry1, ROOF_COL, rop, 0.7));
+    root.add(boxAt(X, X+S, wz0, wz1, ry0, ry1, ROOF_COL, rop, 0.7));   /* over the walkway, no gap */
+    root.add(boxAt(X, X+S, fz0, bz1, ry0, ry1, ROOF_COL, rop, 0.7));
+    for(var i2=0;i2<bands.length;i2++){
+      var b2=bands[i2];
+      if(b2.type==='block')
+        root.add(boxAt(X+b2.x0, X+b2.x1, bz0, fz0, ry0, ry1, ROOF_COL, rop, 0.7));
+      else if(!b2.open && showGlaze){
+        var cy=ry0-0.8;
+        root.add(boxAt(X+b2.x0, X+b2.x1, bz0, fz0, cy, cy+0.12, GLAZE_COL, 0.3, 0.8));
+      }
+    }
+  }
+
+  /* head houses over the external stairs */
+  if(P.STH>0){
+    for(var s2=0;s2<NCOURT;s2++){
+      var ch=courtSpan(s2);
+      if(!ch||!ch.open) continue;
+      var hw2=Math.min(P.STW,ch.b-ch.a)/2;
+      root.add(boxAt(ch.mid-hw2, ch.mid+hw2, fz0-Math.min(P.STP,2), bz1-0.5,
+                     roofY(), roofY()+P.STH, STAIR_COL, op0, 0.95));
+    }
+  }
+
+  /* labels */
+  for(var i3=0;i3<bands.length;i3++){
+    var bd=bands[i3], xm=X+(bd.x0+bd.x1)/2;
+    if(bd.type==='block')
+      labelAnchors.push({txt:bd.name+'  '+(bd.x1-bd.x0).toFixed(1)+' m',
+        pos:new THREE.Vector3(xm, roofY()+2.4, (bz0+fz0)/2),
+        col:'#'+('000000'+ZCOL[bd.zone].toString(16)).slice(-6)});
+    else
+      labelAnchors.push({txt:bd.name+(bd.open?' · open to sky':' · glazed well'),
+        pos:new THREE.Vector3(xm, roofY()+2.4, (bz0+fz0)/2),
+        col:bd.open?'#d97a06':'#7fd4e8'});
+  }
+  if(showLabs) labelAnchors.push({txt:'Laboratories', pos:new THREE.Vector3(0, roofY()+2.4, (lz0+lz1)/2), col:'#8fa3bd'});
+  labelAnchors.push({txt:'Walkway, joined and roofed', pos:new THREE.Vector3(0, floorBaseY(1)+1.4, walkMidZ()), col:'#10aab8'});
+  labelAnchors.push({txt:'South strip, corridor, offices, main stairwells',
+    pos:new THREE.Vector3(0, roofY()+2.4, (fz0+bz1)/2), col:'#5d6e85'});
+
+  labelAnchors.push({txt:'WEST',  pos:new THREE.Vector3(X-11, roofY()/2, 0), col:'#dbe2ea'});
+  labelAnchors.push({txt:'EAST',  pos:new THREE.Vector3(X+S+11, roofY()/2, 0), col:'#dbe2ea'});
+  labelAnchors.push({txt:'NORTH', pos:new THREE.Vector3(0, 1.5, lz0-P.LKO-10), col:'#dbe2ea'});
+  labelAnchors.push({txt:'SOUTH', pos:new THREE.Vector3(0, 1.5, bz1+12), col:'#dbe2ea'});
+
+  /* gateway */
+  var gp=gatewayPos();
+  var mh=Math.max(P.GH,0.3);
+  var mast=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,mh,10),
+            new THREE.MeshLambertMaterial({color:0x10aab8}));
+  mast.position.set(gp.x, gp.y-mh/2, gp.z); root.add(mast);
+  var head=new THREE.Mesh(new THREE.SphereGeometry(1.3,16,12),
+            new THREE.MeshLambertMaterial({color:0x10aab8}));
+  head.position.copy(gp); root.add(head);
+  labelAnchors.push({txt:'Gateway', pos:new THREE.Vector3(gp.x, gp.y+3.4, gp.z), col:'#10aab8'});
+
+  drawRays(); buildLegend();
+}
+
+function gatewayPos(){
+  if(gwOn.charAt(0)==='c'){
+    var ci=parseInt(gwOn.slice(1),10), cs=courtSpan(ci);
+    if(cs) return new THREE.Vector3(cs.mid, roofY()*0.55, (zBlk0()+zFar0())/2);
+  }
+  var gx = x0()+Math.max(0,Math.min(P.GX,P.SPAN));
+  var gz = Math.max(z0(), Math.min(zBlk1(), z0()+P.GZ));
+  return new THREE.Vector3(gx, roofY()+P.GH, gz);
+}
+
+function drawRays(){
+  while(rayGroup.children.length) rayGroup.remove(rayGroup.children[0]);
+  if(!showRays) return;
+  var gp=gatewayPos();
+  for(var z=0;z<NZONE;z++) for(var f=0;f<P.NF;f++){
+    if(!visible[f]) continue;
+    var m=metricsFor(z,f), pts=[gp];
+    if(m.wp1) pts.push(m.wp1);
+    if(m.wp2) pts.push(m.wp2);
+    pts.push(zoneCentroid(z,f));
+    rayGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({color:ZCOL[z], transparent:true,
+        opacity: m.via==='structure'?0.32:0.75})));
+  }
+}
+
+function buildLegend(){
+  var h='';
+  for(var z=0;z<NZONE;z++) h+='<span><i style="background:var('+ZCSS[z]+')"></i>Zone '+(z+1)+'</span>';
+  h+='<span><i style="background:#5d6e85"></i>South strip</span>';
+  h+='<span><i style="background:#4a5c72"></i>Laboratories</span>';
+  h+='<span><i style="background:#d97a06"></i>Stairs and links</span>';
+  h+='<span><i style="background:#7fd4e8"></i>Glazed well</span>';
+  h+='<span><i style="background:#10aab8"></i>Walkway and gateway</span>';
+  document.getElementById('legend').innerHTML=h;
+}
+
+/* ================= metrics ================= */
+function fspl(d){ return 20*Math.log(Math.max(d,1))/Math.LN10 + 31.22; }
+
+/* Bands whose centre lies strictly between the two points. The endpoints are
+   themselves band centres, and the two ways of computing a centre do not agree
+   to the last bit, so the comparison needs a tolerance well under any real
+   dimension. Without it a zone counts its own block as crossed. */
+var SPAN_EPS=0.01;
+function crossingsAlongSpan(xa,xb){
+  var lo=Math.min(xa,xb)+SPAN_EPS, hi=Math.max(xa,xb)-SPAN_EPS;
+  var walls=0, openC=0, glazeC=0, stairs=0;
+  for(var i=0;i<bands.length;i++){
+    var b=bands[i], mid=x0()+(b.x0+b.x1)/2;
+    if(mid<=lo||mid>=hi) continue;
+    if(b.type==='block') walls+=2;      /* in one facade and out the other */
+    else if(b.open){ openC++; stairs++; }
+    else glazeC++;
+  }
+  return {walls:walls, openC:openC, glazeC:glazeC, stairs:stairs};
+}
+
+/* Getting from the gateway to an opening is only free space when the gateway can
+   actually see it. On the roof it looks down into every courtyard. Sitting inside
+   one courtyard it sees that one and the walkway, and must punch through the
+   structure to reach any other. */
+function firstLegWalls(targetX){
+  if(gwOn.charAt(0)!=='c') return 0;
+  var ci=parseInt(gwOn.slice(1),10), cs=courtSpan(ci);
+  if(!cs) return 0;
+  if(Math.abs(targetX-cs.mid)<0.01) return 0;
+  return crossingsAlongSpan(cs.mid, targetX).walls;
+}
+
+function metricsFor(z,f){
+  var gp=gatewayPos(), c=zoneCentroid(z,f);
+  var yMid=floorBaseY(f)+P.SL+(floorH()-P.SL)/2;
+  var faceWalls = 1 + P.NPART;
+  var inCourt = (gwOn.charAt(0)==='c');
+
+  /* route A: straight through the structure. The roof is continuous, so a roof
+     mount pays every slab below it. */
+  var d1=gp.distanceTo(c);
+  var x1=crossingsAlongSpan(gp.x, c.x);
+  var slabs = inCourt ? 0 : (P.NF - f);
+  /* whatever it crosses on the way, it still has to enter the target zone through
+     its own facade and reach the node past the same partitions as any other route */
+  var w1 = x1.walls + faceWalls;
+  var L1 = fspl(d1) + w1*P.LW + slabs*P.LF
+           + x1.openC*P.LEO + x1.glazeC*P.LEG + x1.stairs*P.LST;
+  var best={ via:'structure', d:d1, L:L1, walls:w1, slabs:slabs,
+             openC:x1.openC, glazeC:x1.glazeC, stairs:x1.stairs, along:0, wp1:null, wp2:null };
+
+  /* route B: down a courtyard this zone actually touches, then in through its face */
+  var zs=zoneSpan(z);
+  for(var i=0;i<NCOURT;i++){
+    var cs=courtSpan(i);
+    if(!cs) continue;
+    var touches = Math.abs(cs.b-zs.a)<0.01 || Math.abs(cs.a-zs.b)<0.01;
+    if(!touches) continue;
+    var wx = (Math.abs(cs.b-zs.a)<0.01) ? cs.b : cs.a;
+    var wpB=new THREE.Vector3(wx, yMid, (zBlk0()+zFar0())/2);
+    var dB=gp.distanceTo(wpB)+wpB.distanceTo(c);
+    var entry = cs.open ? P.LEO : P.LEG;
+    var legB = firstLegWalls(cs.mid);
+    var LB = fspl(dB) + entry + (faceWalls+legB)*P.LW;
+    if(LB<best.L) best={ via:'courtyard', d:dB, L:LB, walls:faceWalls+legB, slabs:0,
+                         openC:cs.open?1:0, glazeC:cs.open?0:1, stairs:0,
+                         along:0, wp1:wpB, wp2:null };
+  }
+
+  /* route C: down any open courtyard, into the roofed walkway, along it to the
+     target zone, then in. The walkway is continuous, so it reaches every zone. */
+  for(var j=0;j<NCOURT;j++){
+    var cj=courtSpan(j);
+    if(!cj) continue;
+    var mouth=new THREE.Vector3(cj.mid, yMid, (zBlk0()+zFar0())/2);
+    var wpW=new THREE.Vector3(cj.mid, yMid, walkMidZ());
+    var wpT=new THREE.Vector3(c.x,    yMid, walkMidZ());
+    var along=Math.abs(c.x-cj.mid);
+    var dC=gp.distanceTo(mouth)+mouth.distanceTo(wpW)+along+wpT.distanceTo(c);
+    var entryC = cj.open ? P.LEO : P.LEG;
+    var legC = firstLegWalls(cj.mid);
+    var LC = fspl(dC) + entryC + P.CORR*along + (faceWalls+legC)*P.LW;
+    if(LC<best.L) best={ via:'corridor', d:dC, L:LC, walls:faceWalls+legC, slabs:0,
+                         openC:cj.open?1:0, glazeC:cj.open?0:1, stairs:0,
+                         along:along, wp1:wpW, wp2:wpT };
+  }
+
+  /* route D: straight down the open stair shaft in Z1 or Z4. Only those two zones
+     have one, and it only works from the roof directly above it. */
+  if(showInner && hasCore(z) && !inCourt){
+    var mo=coreMouth(z,f);
+    var dD=gp.distanceTo(mo)+mo.distanceTo(c);
+    var LD = fspl(dD) + P.LSH + (1+P.NPART)*P.LW;
+    if(LD<best.L) best={ via:'shaft', d:dD, L:LD, walls:1+P.NPART, slabs:0,
+                         openC:0, glazeC:0, stairs:1, along:0, wp1:mo, wp2:null };
+  }
+
+  best.rssi = P.EIRP - best.L;
+  best.ok = best.rssi >= P.SENS;
+  return best;
+}
+
+function buildTable(){
+  var h='<table><tr><th>Floor</th>';
+  for(var z=0;z<NZONE;z++) h+='<th>Zone '+(z+1)+'</th>';
+  h+='</tr>';
+  for(var f=P.NF-1;f>=0;f--){
+    h+='<tr><td>'+FLOOR_NAMES[f]+'</td>';
+    for(var z2=0;z2<NZONE;z2++){
+      var m=metricsFor(z2,f), cls=[];
+      if(!m.ok) cls.push('dead');
+      if(m.via==='corridor') cls.push('viacorr');
+      if(m.via==='courtyard') cls.push('viacourt');
+      if(m.via==='shaft') cls.push('viashaft');
+      h+='<td class="'+cls.join(' ')+'" data-z="'+z2+'" data-f="'+f+'">'
+        +m.d.toFixed(0)+' m &middot; '+m.L.toFixed(0)+' dB</td>';
+    }
+    h+='</tr>';
+  }
+  document.getElementById('tableWrap').innerHTML=h+'</table>';
+  var tds=document.querySelectorAll('#tableWrap td[data-z]');
+  for(var i=0;i<tds.length;i++){
+    tds[i].style.cursor='pointer';
+    tds[i].onclick=function(){
+      var z=+this.getAttribute('data-z'), f=+this.getAttribute('data-f'), m=metricsFor(z,f);
+      var how = m.via==='structure' ? 'straight through the structure'
+              : m.via==='courtyard' ? 'down a courtyard beside the zone, then in through its face'
+              : m.via==='shaft' ? 'straight down the Z'+(z+1)+' stair shaft from the roof'
+              : 'down a courtyard, into the walkway, '+m.along.toFixed(0)+' m along it, then in';
+      document.getElementById('detail').innerHTML=
+        '<b style="color:var(--text)">'+FLOOR_NAMES[f]+' floor, Zone '+(z+1)+'.</b> Best route is '
+        +how+'. '+m.d.toFixed(1)+' m folded path, '+m.walls+' wall crossing'+(m.walls===1?'':'s')+', '
+        +m.slabs+' floor slab'+(m.slabs===1?'':'s')+', '+m.openC+' open courtyard'+(m.openC===1?'':'s')
+        +', '+m.glazeC+' glazed well'+(m.glazeC===1?'':'s')+', '+m.stairs+' stair tower'
+        +(m.stairs===1?'':'s')+'. Estimated loss '+m.L.toFixed(1)+' dB, predicted RSSI '
+        +m.rssi.toFixed(1)+' dBm. '+(m.ok?'Above the sensitivity floor.':'Below the sensitivity floor.');
+    };
+  }
+}
+
+/* ================= render ================= */
+function activeCam(){ return planView?camO:camP; }
+function sceneDepth(){ return crossTotal()+P.LKO; }
+function resize(){
+  var w=host.clientWidth,h=host.clientHeight; if(!w||!h) return;
+  renderer.setSize(w,h,false);
+  camP.aspect=w/h; camP.updateProjectionMatrix();
+  var span=Math.max(P.SPAN, sceneDepth())*0.60, a=w/h;
+  if(a>=1){ camO.top=span; camO.bottom=-span; camO.left=-span*a; camO.right=span*a; }
+  else    { camO.left=-span; camO.right=span; camO.top=span/a; camO.bottom=-span/a; }
+  camO.updateProjectionMatrix();
+}
+function render(){
+  if(planView){ camO.position.set(panX,900,panZ+0.001); camO.up.set(0,0,-1); camO.lookAt(panX,0,panZ); }
+  else{
+    camP.position.set(target.x+radius*Math.sin(phi)*Math.cos(theta),
+                      target.y+radius*Math.cos(phi),
+                      target.z+radius*Math.sin(phi)*Math.sin(theta));
+    camP.up.set(0,1,0); camP.lookAt(target);
+  }
+  renderer.render(scene,activeCam()); drawLabels();
+  var gp=gatewayPos();
+  document.getElementById('readout').innerHTML=
+    '<b>'+P.SPAN.toFixed(1)+'</b> m east&ndash;west &times; <b>'+crossTotal().toFixed(1)
+    +'</b> m north&ndash;south &middot; <b>'+P.NF+'</b> floors at <b>'+floorH().toFixed(2)
+    +'</b> m &middot; zone block <b>'+zoneWidth().toFixed(1)+'</b> m &middot; gateway <b>'
+    +gp.y.toFixed(1)+'</b> m above ground';
+}
+function drawLabels(){
+  var w=host.clientWidth,h=host.clientHeight,out='';
+  for(var i=0;i<labelAnchors.length;i++){
+    var a=labelAnchors[i], v=a.pos.clone().project(activeCam());
+    if(v.z>1) continue;
+    var x=(v.x*0.5+0.5)*w, y=(-v.y*0.5+0.5)*h;
+    if(x<-90||x>w+90||y<-30||y>h+30) continue;
+    out+='<div class="lbl" style="left:'+x.toFixed(1)+'px;top:'+y.toFixed(1)+'px;color:'+a.col+'">'+a.txt+'</div>';
+  }
+  labelHost.innerHTML=out;
+}
+function updateDerived(){
+  document.getElementById('envDerived').innerHTML=
+    'Floor to floor <b>'+floorH().toFixed(2)+' m</b>, derived from the roof height, the floor count '
+    +'and the slab. Zone 1 sits at the east end, Zone 6 at the west.';
+  document.getElementById('crossDerived').innerHTML=
+    'North to south totals <b>'+crossTotal().toFixed(2)+' m</b> '
+    +'('+P.LABD.toFixed(2)+' + '+P.GAPD.toFixed(2)+' + '+P.BLKD.toFixed(2)+'). '
+    +'Each zone block is <b>'+zoneWidth().toFixed(1)+' m</b> east to west and '
+    +'<b>'+courtCut().toFixed(1)+' m</b> deep before the south strip. '
+    +'Six blocks, three open courtyards and two wells total <b>'+P.SPAN.toFixed(1)+' m</b>.';
+}
+function refresh(){ build(); buildTable(); updateDerived(); resize(); render(); }
+
+/* ================= controls ================= */
+function clampSet(k,v){
+  var l=LIM[k]; if(!l) return v;
+  v=Math.max(l.min,Math.min(l.max,v));
+  if(l.integer) v=Math.round(v);
+  return v;
+}
+function bind(k){
+  var n=document.getElementById(k), s=document.getElementById(k+'_s');
+  function apply(v){
+    v=parseFloat(v); if(isNaN(v)) return;
+    P[k]=clampSet(k,v);
+    if(n) n.value=P[k];
+    if(s) s.value=P[k];
+    if(k==='NF') buildFloorChecks();
+    refresh();
+  }
+  if(n){ n.addEventListener('change',function(){apply(this.value)});
+         n.addEventListener('input',function(){apply(this.value)}); }
+  if(s) s.addEventListener('input',function(){apply(this.value)});
+}
+for(var key in P) bind(key);
+
+function buildFloorChecks(){
+  var h='';
+  for(var f=P.NF-1;f>=0;f--)
+    h+='<label class="chk"><input type="checkbox" data-f="'+f+'"'+(visible[f]?' checked':'')+'>'+FLOOR_NAMES[f]+'</label>';
+  document.getElementById('floorChecks').innerHTML=h;
+}
+document.getElementById('floorChecks').addEventListener('change',function(e){
+  visible[+e.target.getAttribute('data-f')]=e.target.checked; refresh(); });
+
+function tog(id,fn){ document.getElementById(id).addEventListener('change',function(){fn(this.checked);refresh()}); }
+tog('showLabs',function(v){showLabs=v});
+tog('showWalk',function(v){showWalk=v});
+tog('showLink',function(v){showLink=v});
+tog('showGlaze',function(v){showGlaze=v});
+tog('showInner',function(v){showInner=v});
+tog('showRoof',function(v){showRoof=v});
+tog('rays',function(v){showRays=v});
+tog('ghost',function(v){ghost=v});
+document.getElementById('gwOn').addEventListener('change',function(){gwOn=this.value;refresh()});
+
+document.getElementById('btn3d').onclick=function(){
+  planView=false; this.setAttribute('aria-pressed','true');
+  document.getElementById('btnplan').setAttribute('aria-pressed','false'); resize(); render(); };
+document.getElementById('btnplan').onclick=function(){
+  planView=true; this.setAttribute('aria-pressed','true');
+  document.getElementById('btn3d').setAttribute('aria-pressed','false'); resize(); render(); };
+document.getElementById('fitbtn').onclick=function(){
+  radius=Math.max(P.SPAN, sceneDepth())*1.15; theta=0.80; phi=1.00;
+  target.set(0, roofY()/2, 0); panX=0; panZ=0; render(); };
+document.getElementById('shotbtn').onclick=function(){
+  render(); var a=document.createElement('a');
+  a.download = planView?'cans-plan.png':'cans-3d.png';
+  a.href=renderer.domElement.toDataURL('image/png'); a.click(); };
+
+function collectSettings(){
+  return { P:P, COURT_OPEN:COURT_OPEN, visible:visible.slice(0,P.NF),
+           showLabs:showLabs, showWalk:showWalk, showLink:showLink, showGlaze:showGlaze,
+           showInner:showInner, showRoof:showRoof, showRays:showRays, ghost:ghost, gwOn:gwOn };
+}
+document.getElementById('expBtn').onclick=function(){
+  document.getElementById('cfgBox').value=JSON.stringify(collectSettings());
+  document.getElementById('cfgMsg').textContent='Exported. Select all in the box and copy it.';
+};
+document.getElementById('impBtn').onclick=function(){
+  var msg=document.getElementById('cfgMsg');
+  try{
+    var o=JSON.parse(document.getElementById('cfgBox').value);
+    if(o.P) for(var k in o.P){ if(P.hasOwnProperty(k)) P[k]=clampSet(k,parseFloat(o.P[k])); }
+    if(Array.isArray(o.COURT_OPEN))
+      for(var j=0;j<NCOURT&&j<o.COURT_OPEN.length;j++) COURT_OPEN[j]=!!o.COURT_OPEN[j];
+    if(Array.isArray(o.visible))
+      for(var v=0;v<o.visible.length&&v<visible.length;v++) visible[v]=!!o.visible[v];
+    if(typeof o.showLabs==='boolean') showLabs=o.showLabs;
+    if(typeof o.showWalk==='boolean') showWalk=o.showWalk;
+    if(typeof o.showLink==='boolean') showLink=o.showLink;
+    if(typeof o.showGlaze==='boolean') showGlaze=o.showGlaze;
+    if(typeof o.showInner==='boolean') showInner=o.showInner;
+    if(typeof o.showRoof==='boolean') showRoof=o.showRoof;
+    if(typeof o.showRays==='boolean') showRays=o.showRays;
+    if(typeof o.ghost==='boolean') ghost=o.ghost;
+    if(o.gwOn) gwOn=o.gwOn;
+    syncInputs(); buildFloorChecks(); refresh();
+    msg.textContent='Applied.';
+  }catch(err){ msg.textContent='Could not read that. Check it is the full exported text.'; }
+};
+function syncInputs(){
+  for(var k in P){
+    var n=document.getElementById(k), sl=document.getElementById(k+'_s');
+    if(n) n.value=P[k];
+    if(sl) sl.value=P[k];
+  }
+  document.getElementById('showLabs').checked=showLabs;
+  document.getElementById('showWalk').checked=showWalk;
+  document.getElementById('showLink').checked=showLink;
+  document.getElementById('showGlaze').checked=showGlaze;
+  document.getElementById('showInner').checked=showInner;
+  document.getElementById('showRoof').checked=showRoof;
+  document.getElementById('rays').checked=showRays;
+  document.getElementById('ghost').checked=ghost;
+  document.getElementById('gwOn').value=gwOn;
+}
+
+/* Orbit with the left button, pan with the middle or right button, with shift
+   held, or with two fingers. In plan view every drag pans, since there is
+   nothing to orbit. */
+var drag=false, panning=false, lx=0, ly=0;
+function isPanGesture(e){
+  return e.shiftKey || e.button===1 || e.button===2 || e.ctrlKey || e.metaKey;
+}
+host.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+host.addEventListener('pointerdown',function(e){
+  drag=true; panning=isPanGesture(e); lx=e.clientX; ly=e.clientY;
+  host.setPointerCapture(e.pointerId);
+  host.style.cursor = (panning||planView) ? 'move' : 'grabbing';
+});
+function endDrag(){ drag=false; panning=false; host.style.cursor='default'; }
+host.addEventListener('pointerup',endDrag);
+host.addEventListener('pointercancel',endDrag);
+host.addEventListener('pointerleave',function(){ if(drag) endDrag(); });
+host.addEventListener('pointermove',function(e){
+  if(!drag) return;
+  var dx=e.clientX-lx, dy=e.clientY-ly;
+  lx=e.clientX; ly=e.clientY;
+
+  if(planView){
+    /* ortho: one screen pixel is (2*span)/height world units */
+    var sp=Math.max(P.SPAN,sceneDepth())*0.60;
+    var k=(2*sp)/Math.max(1,host.clientHeight);
+    panX-=dx*k; panZ-=dy*k;
+    render(); return;
+  }
+
+  if(panning){
+    /* move the orbit target across the view plane */
+    var s=radius*0.0015;
+    var rx=Math.sin(theta), rz=-Math.cos(theta);                 /* camera right */
+    var ux=-Math.cos(theta)*Math.cos(phi), uy=Math.sin(phi),
+        uz=-Math.sin(theta)*Math.cos(phi);                       /* camera up */
+    target.x += -dx*s*rx + dy*s*ux;
+    target.y +=            dy*s*uy;
+    target.z += -dx*s*rz + dy*s*uz;
+  } else {
+    theta-=dx*0.006;
+    phi=Math.max(0.12,Math.min(Math.PI/2-0.02, phi-dy*0.006));
+  }
+  render();
+});
+host.addEventListener('wheel',function(e){
+  e.preventDefault();
+  radius=Math.max(25,Math.min(2200, radius*(1+(e.deltaY>0?1:-1)*0.08)));
+  render(); },{passive:false});
+window.addEventListener('resize',function(){resize();render()});
+
+buildFloorChecks();
+refresh();
+document.getElementById('fitbtn').click();
+</script>
